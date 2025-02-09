@@ -1,9 +1,14 @@
 import streamlit as st
 import fitz
 from openai import OpenAI
+import argparse
+
+parser = argparse.ArgumentParser(description="PDF 摘要生成器")
+parser.add_argument("--api_key", type=str, required=True, help="API Key")
+args = parser.parse_args()
 
 client_openrouter = OpenAI(
-    api_key="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",
+    api_key=args.api_key,
     base_url="https://openrouter.ai/api/v1"
 )
 
