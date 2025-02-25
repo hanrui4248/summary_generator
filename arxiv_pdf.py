@@ -74,8 +74,7 @@ def fetch_papers(pdf_folder_path, csv_filename=FILENAME):
             })
             # 下载PDF文件
             try:
-                pdf_path = os.path.join(pdf_folder_path, f"{r.get_short_id()}.pdf")
-                r.download_pdf(filename=pdf_path)
+                r.download_pdf(dirpath = pdf_folder_path, filename=str(r.title) + ".pdf")
                 downloaded_count += 1
             except Exception as e:
                 logging.error(f"下载PDF失败 {r.title}: {str(e)}")
