@@ -2,6 +2,7 @@ import arxiv as arxiv
 import csv
 import pandas as pd
 import logging
+import os
 
 
 QUERY = "cat:cs.AI"
@@ -30,12 +31,19 @@ def load_authors_csv():
     return [google_authors, meta_authors]
 
 
-def main():
+def fetch_papers(pdf_folder_path, csv_filename=FILENAME):
+    """
+    抓取论文并下载PDF文件
+    :param pdf_folder_path: PDF文件保存路径
+    :param csv_filename: CSV文件保存路径
+    :return: 下载的论文数量
+    """
     key_authors = load_authors_csv()
     final_query = QUERY + " AND ("
     for author in key_authors[0]: #testing google for now
         final_query = final_query + author + " OR "
     final_query = final_query[:-4] + ")" #Removing final " OR "
+    
     client = arxiv.Client()
     search = arxiv.Search(
         query =  "submittedDate:[202501081200 TO 202502151200] AND " + final_query,
@@ -44,23 +52,39 @@ def main():
         max_results = 10 
     )
     results = client.results(search)
+    
+    # 确保PDF保存目录存在
+    os.makedirs(pdf_folder_path, exist_ok=True)
+    
+    # 写入CSV文件
     header = ["Title", "Authors", "Abstract", "Primary Category", "Categories", "URL"]
-    file = open(FILENAME, "w", newline = "", encoding="utf-8")
-    with file:
+    downloaded_count = 0
+    
+    with open(csv_filename, "w", newline="", encoding="utf-8") as file:
         writer = csv.DictWriter(file, fieldnames=header)
         writer.writeheader()
         for r in results:
             writer.writerow({
-                "Title" : r.title,
-                "Authors" : r.authors,
-                "Abstract" : r.summary,
-                "Primary Category" : r.primary_category,
-                "Categories" : r.categories,
-                "URL" : r
+                "Title": r.title,
+                "Authors": r.authors,
+                "Abstract": r.summary,
+                "Primary Category": r.primary_category,
+                "Categories": r.categories,
+                "URL": r
             })
-            #r.download_pdf()
-            #r.download_source()
-    file.close()
-if __name__ == "__main__":
+            # 下载PDF文件
+            try:
+                pdf_path = os.path.join(pdf_folder_path, f"{r.get_short_id()}.pdf")
+                r.download_pdf(filename=pdf_path)
+                downloaded_count += 1
+            except Exception as e:
+                logging.error(f"下载PDF失败 {r.title}: {str(e)}")
+    
+    return downloaded_count
+
+def main():
     logging.basicConfig(level=logging.DEBUG)
+    fetch_papers("pdf_folder")
+
+if __name__ == "__main__":
     main()
