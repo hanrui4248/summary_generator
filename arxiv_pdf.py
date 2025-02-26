@@ -3,6 +3,7 @@ import csv
 import pandas as pd
 import logging
 import os
+import tarfile
 
 
 QUERY = "cat:cs.AI"
@@ -49,7 +50,7 @@ def fetch_papers(pdf_folder_path, csv_filename=FILENAME):
         query =  "submittedDate:[202501081200 TO 202502151200] AND " + final_query,
         sort_by = arxiv.SortCriterion.LastUpdatedDate,
         sort_order = arxiv.SortOrder.Descending,
-        max_results = 10 
+        max_results = 1 
     )
     results = client.results(search)
     
@@ -74,12 +75,35 @@ def fetch_papers(pdf_folder_path, csv_filename=FILENAME):
             })
             # 下载PDF文件
             try:
-                r.download_pdf(dirpath = pdf_folder_path, filename=str(r.title) + ".pdf")
+                #r.download_pdf(dirpath = pdf_folder_path, filename=str(r.title) + ".pdf")
+                #r.download_source(dirpath = "./temp")
                 downloaded_count += 1
             except Exception as e:
                 logging.error(f"下载PDF失败 {r.title}: {str(e)}")
+
+            #TODO: extract temp and clean
+            extract_figure_and_clean_archive()
     
     return downloaded_count
+def extract_figure_and_clean_archive():
+    unzip_archive()
+    isolate_image()
+    clean_dir()
+
+
+def unzip_archive():
+    f = os.listdir('./temp')[0]
+    f = os.path.join("./temp", f)
+    if f.endswith("tar.gz"):
+        tar = tarfile.open(f, "r:gz")
+        tar.extractall(path = "./temp")
+        tar.close()
+
+def isolate_image():
+    pass
+
+def clean_dir():
+    pass
 
 def main():
     logging.basicConfig(level=logging.DEBUG)
