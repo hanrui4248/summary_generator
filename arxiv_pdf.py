@@ -4,6 +4,7 @@ import pandas as pd
 import logging
 import os
 import tarfile
+from datetime import datetime
 
 
 QUERY = "cat:cs.AI"
@@ -45,12 +46,13 @@ def fetch_papers(pdf_folder_path, csv_filename=FILENAME):
         final_query = final_query + author + " OR "
     final_query = final_query[:-4] + ")" #Removing final " OR "
     
+    start_date, end_date = get_last_day()
     client = arxiv.Client()
     search = arxiv.Search(
-        query =  "submittedDate:[202501081200 TO 202502151200] AND " + final_query,
+        query =  f"submittedDate:[{start_date} TO {end_date}] AND {final_query}",
         sort_by = arxiv.SortCriterion.LastUpdatedDate,
         sort_order = arxiv.SortOrder.Descending,
-        max_results = 1 
+        max_results = 10 
     )
     results = client.results(search)
     
@@ -60,14 +62,17 @@ def fetch_papers(pdf_folder_path, csv_filename=FILENAME):
     # 写入CSV文件
     header = ["Title", "Authors", "Abstract", "Primary Category", "Categories", "URL"]
     downloaded_count = 0
-    
-    with open(csv_filename, "w", newline="", encoding="utf-8") as file:
+    write_type = "a" if os.path.isfile(csv_filename) else write_type = "w"
+    with open(csv_filename, write_type, newline="", encoding="utf-8") as file:
         writer = csv.DictWriter(file, fieldnames=header)
-        writer.writeheader()
+        writer.writeheader() if write_type == "w" else None
         for r in results:
+            authors_strings = []
+            for author in r.authors:
+                authors_strings.append(str(author))
             writer.writerow({
                 "Title": r.title,
-                "Authors": r.authors,
+                "Authors": authors_strings,
                 "Abstract": r.summary,
                 "Primary Category": r.primary_category,
                 "Categories": r.categories,
@@ -82,7 +87,7 @@ def fetch_papers(pdf_folder_path, csv_filename=FILENAME):
                 logging.error(f"下载PDF失败 {r.title}: {str(e)}")
 
             #TODO: extract temp and clean
-            extract_figure_and_clean_archive()
+            #extract_figure_and_clean_archive()
     
     return downloaded_count
 def extract_figure_and_clean_archive():
@@ -90,6 +95,13 @@ def extract_figure_and_clean_archive():
     isolate_image()
     clean_dir()
 
+def get_last_day():
+    today = datetime.today()
+    yesterday = today - datetime.timedelta(1)
+
+    end_time = today.strftime("%Y%m%d") + "1200"
+    start_time = today.strftime("%Y%m%d") + "1200"
+    return start_time, end_time
 
 def unzip_archive():
     f = os.listdir('./temp')[0]
