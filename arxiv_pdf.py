@@ -34,26 +34,32 @@ def load_authors_csv():
     return [google_authors, meta_authors]
 
 
-def fetch_papers(pdf_folder_path, csv_filename=FILENAME):
+def fetch_papers(pdf_folder_path, csv_filename=FILENAME, query = QUERY, author_filter = True, start_date = None, end_date = None):
     """
     抓取论文并下载PDF文件
     :param pdf_folder_path: PDF文件保存路径
     :param csv_filename: CSV文件保存路径
     :return: 下载的论文数量
     """
-    key_authors = load_authors_csv()
-    final_query = QUERY + " AND ("
-    for author in key_authors[0]: #testing google for now
-        final_query = final_query + author + " OR "
-    final_query = final_query[:-4] + ")" #Removing final " OR "
-    
-    start_date, end_date = get_last_day()
+    if author_filter:
+        key_authors = load_authors_csv()
+        final_query = query + " AND ("
+        for author in key_authors[0]: #testing google for now
+            final_query = final_query + author + " OR "
+        final_query = final_query[:-4] + ")" #Removing final " OR "
+    else:
+        final_query = query
+    if start_date == None or end_date == None:
+        start_date, end_date = get_last_day()
+    else:
+        start_date = start_date.strftime("%Y%m%d") + "1200"
+        end_date = end_date.strftime("%Y%m%d") + "1200"
     client = arxiv.Client()
     search = arxiv.Search(
         query =  f"submittedDate:[{start_date} TO {end_date}] AND {final_query}",
         sort_by = arxiv.SortCriterion.LastUpdatedDate,
         sort_order = arxiv.SortOrder.Descending,
-        max_results = 10 
+        max_results = 5 
     )
     results = client.results(search)
     
@@ -83,9 +89,9 @@ def fetch_papers(pdf_folder_path, csv_filename=FILENAME):
             # 下载PDF文件
             short_id = r.get_short_id()
             try:
-                #r.download_pdf(dirpath = pdf_folder_path, filename=str(r.title) + ".pdf")
+                r.download_pdf(dirpath = pdf_folder_path, filename=str(r.title) + ".pdf")
                 downloaded_count += 1
-                himage.get_image(f"https://arxiv.org/html/{short_id}",short_id, f"image{downloaded_count}")
+                #himage.get_image(f"https://arxiv.org/html/{short_id}",short_id, f"image{downloaded_count}")
             except Exception as e:
                 logging.error(f"下载PDF失败 {r.title}: {str(e)}")
     

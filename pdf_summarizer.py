@@ -161,6 +161,8 @@ with tab2:
             with st.spinner("正在从arxiv抓取论文..."):
                 try:
                     downloaded_count = arxiv_pdf.fetch_papers(folder_path, csv_filename)
+                    # fetch_papers(pdf_folder_path, csv_filename=FILENAME, query = QUERY, author_filter = True, start_date = None, end_date = None
+                    # fetch_papers(folder_path, filename, "Autonomous Driving", False, datetime object, datetime object)
                     st.success(f"成功下载 {downloaded_count} 篇论文到 {folder_path} 文件夹")
                     st.info(f"论文信息已保存到 {csv_filename}")
                 except Exception as e:
