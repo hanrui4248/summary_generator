@@ -4,7 +4,8 @@ import pandas as pd
 import logging
 import os
 import tarfile
-from datetime import datetime
+import datetime as dt
+import html_image_extractor as himage
 
 
 QUERY = "cat:cs.AI"
@@ -62,7 +63,7 @@ def fetch_papers(pdf_folder_path, csv_filename=FILENAME):
     # 写入CSV文件
     header = ["Title", "Authors", "Abstract", "Primary Category", "Categories", "URL"]
     downloaded_count = 0
-    write_type = "a" if os.path.isfile(csv_filename) else write_type = "w"
+    write_type = "a" if os.path.isfile(csv_filename) else "w"
     with open(csv_filename, write_type, newline="", encoding="utf-8") as file:
         writer = csv.DictWriter(file, fieldnames=header)
         writer.writeheader() if write_type == "w" else None
@@ -79,28 +80,22 @@ def fetch_papers(pdf_folder_path, csv_filename=FILENAME):
                 "URL": r
             })
             # 下载PDF文件
-            try:
+            short_id = r.get_short_id()
+            #try:
                 #r.download_pdf(dirpath = pdf_folder_path, filename=str(r.title) + ".pdf")
-                #r.download_source(dirpath = "./temp")
-                downloaded_count += 1
-            except Exception as e:
-                logging.error(f"下载PDF失败 {r.title}: {str(e)}")
-
-            #TODO: extract temp and clean
-            #extract_figure_and_clean_archive()
+            downloaded_count += 1
+            himage.get_image(f"https://arxiv.org/html/{short_id}",short_id, f"image{downloaded_count}")
+            #except Exception as e:
+             #   logging.error(f"下载PDF失败 {r.title}: {str(e)}")
     
     return downloaded_count
-def extract_figure_and_clean_archive():
-    unzip_archive()
-    isolate_image()
-    clean_dir()
 
 def get_last_day():
-    today = datetime.today()
-    yesterday = today - datetime.timedelta(1)
+    today = dt.datetime.today()
+    yesterday = today - dt.timedelta(10)
 
     end_time = today.strftime("%Y%m%d") + "1200"
-    start_time = today.strftime("%Y%m%d") + "1200"
+    start_time = yesterday.strftime("%Y%m%d") + "1200"
     return start_time, end_time
 
 def unzip_archive():
@@ -111,14 +106,8 @@ def unzip_archive():
         tar.extractall(path = "./temp")
         tar.close()
 
-def isolate_image():
-    pass
-
-def clean_dir():
-    pass
-
 def main():
-    logging.basicConfig(level=logging.DEBUG)
+    #logging.basicConfig(level=logging.DEBUG)
     fetch_papers("pdf_folder")
 
 if __name__ == "__main__":
