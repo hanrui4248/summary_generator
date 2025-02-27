@@ -4,7 +4,8 @@ import pandas as pd
 import logging
 import os
 import tarfile
-from datetime import datetime, timedelta
+import datetime as dt
+import html_image_extractor as himage
 
 
 QUERY = "cat:cs.AI"
@@ -80,25 +81,19 @@ def fetch_papers(pdf_folder_path, csv_filename=FILENAME):
                 "Date": r.published
             })
             # 下载PDF文件
-            try:
-                r.download_pdf(dirpath = pdf_folder_path, filename=str(r.title) + ".pdf")
-                #r.download_source(dirpath = "./temp")
-                downloaded_count += 1
-            except Exception as e:
-                logging.error(f"下载PDF失败 {r.title}: {str(e)}")
-
-            #TODO: extract temp and clean
-            #extract_figure_and_clean_archive()
+            short_id = r.get_short_id()
+            #try:
+                #r.download_pdf(dirpath = pdf_folder_path, filename=str(r.title) + ".pdf")
+            downloaded_count += 1
+            himage.get_image(f"https://arxiv.org/html/{short_id}",short_id, f"image{downloaded_count}")
+            #except Exception as e:
+             #   logging.error(f"下载PDF失败 {r.title}: {str(e)}")
     
     return downloaded_count
-def extract_figure_and_clean_archive():
-    unzip_archive()
-    isolate_image()
-    clean_dir()
 
 def get_last_day():
-    today = datetime.today()
-    yesterday = today - timedelta(120)
+    today = dt.datetime.today()
+    yesterday = today - dt.timedelta(10)
 
     end_time = today.strftime("%Y%m%d") + "1200"
     start_time = yesterday.strftime("%Y%m%d") + "1200"
@@ -112,14 +107,8 @@ def unzip_archive():
         tar.extractall(path = "./temp")
         tar.close()
 
-def isolate_image():
-    pass
-
-def clean_dir():
-    pass
-
 def main():
-    logging.basicConfig(level=logging.DEBUG)
+    #logging.basicConfig(level=logging.DEBUG)
     fetch_papers("pdf_folder")
 
 if __name__ == "__main__":
