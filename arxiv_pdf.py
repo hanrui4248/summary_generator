@@ -4,7 +4,7 @@ import pandas as pd
 import logging
 import os
 import tarfile
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 QUERY = "cat:cs.AI"
@@ -60,9 +60,9 @@ def fetch_papers(pdf_folder_path, csv_filename=FILENAME):
     os.makedirs(pdf_folder_path, exist_ok=True)
     
     # 写入CSV文件
-    header = ["Title", "Authors", "Abstract", "Primary Category", "Categories", "URL"]
+    header = ["Title", "Authors", "Abstract", "Primary Category", "Categories", "URL", "Date"]
     downloaded_count = 0
-    write_type = "a" if os.path.isfile(csv_filename) else write_type = "w"
+    write_type = "a" if os.path.isfile(csv_filename) else "w"
     with open(csv_filename, write_type, newline="", encoding="utf-8") as file:
         writer = csv.DictWriter(file, fieldnames=header)
         writer.writeheader() if write_type == "w" else None
@@ -76,11 +76,12 @@ def fetch_papers(pdf_folder_path, csv_filename=FILENAME):
                 "Abstract": r.summary,
                 "Primary Category": r.primary_category,
                 "Categories": r.categories,
-                "URL": r
+                "URL": r,
+                "Date": r.published
             })
             # 下载PDF文件
             try:
-                #r.download_pdf(dirpath = pdf_folder_path, filename=str(r.title) + ".pdf")
+                r.download_pdf(dirpath = pdf_folder_path, filename=str(r.title) + ".pdf")
                 #r.download_source(dirpath = "./temp")
                 downloaded_count += 1
             except Exception as e:
@@ -97,10 +98,10 @@ def extract_figure_and_clean_archive():
 
 def get_last_day():
     today = datetime.today()
-    yesterday = today - datetime.timedelta(1)
+    yesterday = today - timedelta(120)
 
     end_time = today.strftime("%Y%m%d") + "1200"
-    start_time = today.strftime("%Y%m%d") + "1200"
+    start_time = yesterday.strftime("%Y%m%d") + "1200"
     return start_time, end_time
 
 def unzip_archive():

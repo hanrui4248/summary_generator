@@ -6,6 +6,14 @@ import os
 from datetime import datetime
 import arxiv_pdf
 import time
+import pandas as pd
+
+# 在最开始添加页面配置
+st.set_page_config(
+    page_title="论文快报生成器",
+    layout="wide",  # 使用宽屏布局
+    initial_sidebar_state="collapsed"  # 默认收起侧边栏
+)
 
 parser = argparse.ArgumentParser(description="PDF 摘要生成器")
 parser.add_argument("--api_key", type=str, required=True, help="API Key")
@@ -119,23 +127,10 @@ with tab1:
     folder_path = "pdf_folder"
     model_name = st.selectbox("选择模型", MODEL_OPTIONS)
 
-    # 显示文件夹状态
-    if os.path.isdir(folder_path):
-        st.write("**文件夹路径**：", folder_path)
-        pdf_files = [f for f in os.listdir(folder_path) if f.lower().endswith('.pdf')]
-        st.write(f"发现 {len(pdf_files)} 个PDF文件")
-        
-        # 添加可滚动区域显示PDF文件列表
-        with st.expander("查看PDF文件列表", expanded=True):
-            pdf_files_text = "\n".join([f"{i+1}. {pdf}" for i, pdf in enumerate(pdf_files)])
-            st.markdown(pdf_files_text)
-    else:
-        st.error(f"文件夹 {folder_path} 不存在")
-
-    # 生成按钮始终可见
+    # 生成按钮
     if st.button("生成论文快报"):
         if not os.path.isdir(folder_path):
-            st.error("请先选择有效的PDF文件夹")
+            st.error("请先创建pdf_folder文件夹")
         else:
             with st.spinner("正在生成论文快报..."):
                 report = generate_daily_report(folder_path, model_name)
@@ -159,11 +154,53 @@ with tab2:
     # 使用固定的CSV文件名
     csv_filename = "papers.csv"
     
-    if st.button("开始抓取论文"):
-        with st.spinner("正在从arxiv抓取论文..."):
-            try:
-                downloaded_count = arxiv_pdf.fetch_papers(folder_path, csv_filename)
-                st.success(f"成功下载 {downloaded_count} 篇论文到 {folder_path} 文件夹")
-                st.info(f"论文信息已保存到 {csv_filename}")
-            except Exception as e:
-                st.error(f"抓取论文时发生错误: {str(e)}")
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        if st.button("开始抓取论文"):
+            with st.spinner("正在从arxiv抓取论文..."):
+                try:
+                    downloaded_count = arxiv_pdf.fetch_papers(folder_path, csv_filename)
+                    st.success(f"成功下载 {downloaded_count} 篇论文到 {folder_path} 文件夹")
+                    st.info(f"论文信息已保存到 {csv_filename}")
+                except Exception as e:
+                    st.error(f"抓取论文时发生错误: {str(e)}")
+    
+    # 如果CSV文件存在，显示论文列表
+    if os.path.exists(csv_filename):
+        try:
+            # 读取CSV文件
+            df = pd.read_csv(csv_filename)
+            
+            # 将Date列转换为datetime类型
+            df['Date'] = pd.to_datetime(df['Date'])
+            
+            # 获取所有可用的日期
+            available_dates = df['Date'].dt.date.unique()
+            
+            with col2:
+                # 添加日期选择器
+                selected_date = st.selectbox(
+                    "选择日期",
+                    options=available_dates,
+                    format_func=lambda x: x.strftime('%Y-%m-%d')
+                )
+            
+            # 根据选择的日期筛选数据
+            filtered_df = df[df['Date'].dt.date == selected_date]
+            
+            # 创建标题的超链接
+            filtered_df['Title'] = filtered_df.apply(
+                lambda x: f'<a href="{x["URL"]}" target="_blank">{x["Title"]}</a>', 
+                axis=1
+            )
+            
+            # 显示筛选后的数据表格，显示标题、作者、摘要和日期
+            st.write(
+                filtered_df[['Title', 'Authors', 'Abstract', 'Date']]
+                .to_html(escape=False, index=False),
+                unsafe_allow_html=True
+            )
+            
+        except Exception as e:
+            st.error(f"读取CSV文件时发生错误: {str(e)}")
