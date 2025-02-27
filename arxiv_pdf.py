@@ -82,12 +82,12 @@ def fetch_papers(pdf_folder_path, csv_filename=FILENAME):
             })
             # 下载PDF文件
             short_id = r.get_short_id()
-            #try:
+            try:
                 #r.download_pdf(dirpath = pdf_folder_path, filename=str(r.title) + ".pdf")
-            downloaded_count += 1
-            himage.get_image(f"https://arxiv.org/html/{short_id}",short_id, f"image{downloaded_count}")
-            #except Exception as e:
-             #   logging.error(f"下载PDF失败 {r.title}: {str(e)}")
+                downloaded_count += 1
+                himage.get_image(f"https://arxiv.org/html/{short_id}",short_id, f"image{downloaded_count}")
+            except Exception as e:
+                logging.error(f"下载PDF失败 {r.title}: {str(e)}")
     
     return downloaded_count
 
