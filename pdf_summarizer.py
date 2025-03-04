@@ -3,7 +3,7 @@ import fitz
 from openai import OpenAI
 import argparse
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import arxiv_pdf
 import time
 import pandas as pd
@@ -26,7 +26,7 @@ client_openrouter = OpenAI(
 
 # 可用模型列表
 MODEL_OPTIONS = [
-    "google/gemini-exp-1206:free", 
+    "google/gemini-2.0-flash-lite-001", 
     "google/gemini-2.0-flash-thinking-exp:free", 
     "google/gemini-2.0-flash-lite-preview-02-05:free",
     "mistralai/mistral-7b-instruct:free",
@@ -66,55 +66,72 @@ def summarize_text(text, model_name):
     except Exception as e:
         raise Exception(f"生成摘要时出错: {str(e)}")
 
-def generate_daily_report(pdf_folder, model_name):
-    """生成每日论文快报"""
+def generate_daily_report_from_df(df, model_name):
+    """根据DataFrame中的论文生成每日快报"""
     summaries = []
     errors = []
     
-    for filename in os.listdir(pdf_folder):
-        if filename.lower().endswith('.pdf'):
-            pdf_path = os.path.join(pdf_folder, filename)
-            try:
-                # 添加PDF文本提取的错误处理
-                pdf_text = extract_text_from_pdf(pdf_path)
-                if not pdf_text or len(pdf_text.strip()) == 0:
-                    raise Exception("PDF文本提取为空")
-                
-                # 尝试最多3次生成摘要
-                max_retries = 3
-                for attempt in range(max_retries):
-                    try:
-                        summary = summarize_text(pdf_text, model_name)
-                        if summary:
-                            summaries.append((filename, summary))
-                            break
-                    except Exception as e:
-                        if attempt == max_retries - 1:  # 最后一次尝试
-                            error_msg = f"处理文件 {filename} 失败 (尝试 {attempt + 1}/{max_retries}): {str(e)}"
-                            st.error(error_msg)
-                            errors.append((filename, str(e)))
-                        time.sleep(2)  # 失败后等待2秒再重试
-                        
-            except Exception as e:
-                error_msg = f"处理文件 {filename} 时出错: {str(e)}"
-                st.error(error_msg)
-                errors.append((filename, str(e)))
+    # 获取images文件夹中的图片列表
+    images_folder = "images"
+    image_files = []
+    if os.path.exists(images_folder):
+        image_files = sorted([f for f in os.listdir(images_folder) 
+                            if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif'))])
+    
+    # 使用enumerate来获取连续的索引
+    for paper_idx, (_, row) in enumerate(df.iterrows()):
+        try:
+            # 显示当前处理的论文标题
+            status_text = st.empty()
+            status_text.text(f"正在处理: {row['Title']}")
+            
+            # 使用论文的摘要生成中文总结
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    summary = summarize_text(row['Abstract'], model_name)
+                    if summary:
+                        # 使用paper_idx代替index进行图片匹配
+                        image_path = None
+                        if paper_idx < len(image_files):
+                            image_path = os.path.join(images_folder, image_files[paper_idx])
+                        summaries.append((row['Title'], summary, image_path))
+                        break
+                except Exception as e:
+                    if attempt == max_retries - 1:
+                        error_msg = f"处理论文 {row['Title']} 失败 (尝试 {attempt + 1}/{max_retries}): {str(e)}"
+                        st.error(error_msg)
+                        errors.append((row['Title'], str(e)))
+                    time.sleep(2)
+                    
+        except Exception as e:
+            error_msg = f"处理论文 {row['Title']} 时出错: {str(e)}"
+            st.error(error_msg)
+            errors.append((row['Title'], str(e)))
+    
+    # 清除状态文本
+    if 'status_text' in locals():
+        status_text.empty()
     
     # 生成markdown格式的报告
-    today = datetime.now().strftime("%Y%m%d")
-    report = f"# 论文快报_{today}\n\n"
+    report = f"# 论文快报_{df['Date'].dt.date.iloc[0]}\n\n"
     
     if summaries:
-        for i, (filename, summary) in enumerate(summaries, 1):
-            report += f"## {i}. {filename}\n\n{summary}\n\n---\n\n"
+        for i, (title, summary, image_path) in enumerate(summaries, 1):
+            report += f"## {i}. {title}\n\n{summary}\n\n"
+            # 如果有图片，添加图片链接
+            if image_path and os.path.exists(image_path):
+                relative_path = image_path.replace('images/', './images/')
+                report += f"![论文图片]({relative_path})\n\n"
+            report += "---\n\n"
     
     # 添加错误报告部分
     if errors:
-        report += "\n## 处理失败的文件\n\n"
-        for filename, error in errors:
-            report += f"- {filename}: {error}\n"
+        report += "\n## 处理失败的论文\n\n"
+        for title, error in errors:
+            report += f"- {title}: {error}\n"
     
-    return report
+    return report, summaries  # 返回报告文本和摘要列表
 
 # Streamlit 界面
 st.title("论文快报生成器")
@@ -127,48 +144,8 @@ with tab1:
     folder_path = "pdf_folder"
     model_name = st.selectbox("选择模型", MODEL_OPTIONS)
 
-    # 生成按钮
-    if st.button("生成论文快报"):
-        if not os.path.isdir(folder_path):
-            st.error("请先创建pdf_folder文件夹")
-        else:
-            with st.spinner("正在生成论文快报..."):
-                report = generate_daily_report(folder_path, model_name)
-                
-                # 显示报告
-                st.markdown(report)
-                
-                # 添加下载按钮
-                today = datetime.now().strftime("%Y%m%d")
-                report_filename = f"论文快报_{today}.md"
-                st.download_button(
-                    label="下载论文快报",
-                    data=report,
-                    file_name=report_filename,
-                    mime="text/markdown"
-                )
-
-with tab2:
-    st.header("arxiv论文抓取")
-    
-    # 使用固定的CSV文件名
+    # 添加论文列表显示
     csv_filename = "papers.csv"
-    
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        if st.button("开始抓取论文"):
-            with st.spinner("正在从arxiv抓取论文..."):
-                try:
-                    downloaded_count = arxiv_pdf.fetch_papers(folder_path, csv_filename)
-                    # fetch_papers(pdf_folder_path, csv_filename=FILENAME, query = QUERY, author_filter = True, start_date = None, end_date = None
-                    # fetch_papers(folder_path, filename, "Autonomous Driving", False, datetime object, datetime object)
-                    st.success(f"成功下载 {downloaded_count} 篇论文到 {folder_path} 文件夹")
-                    st.info(f"论文信息已保存到 {csv_filename}")
-                except Exception as e:
-                    st.error(f"抓取论文时发生错误: {str(e)}")
-    
-    # 如果CSV文件存在，显示论文列表
     if os.path.exists(csv_filename):
         try:
             # 读取CSV文件
@@ -180,29 +157,121 @@ with tab2:
             # 获取所有可用的日期
             available_dates = df['Date'].dt.date.unique()
             
-            with col2:
-                # 添加日期选择器
-                selected_date = st.selectbox(
-                    "选择日期",
-                    options=available_dates,
-                    format_func=lambda x: x.strftime('%Y-%m-%d')
-                )
+            # 添加日期选择器
+            selected_date = st.selectbox(
+                "选择日期",
+                options=available_dates,
+                format_func=lambda x: x.strftime('%Y-%m-%d')
+            )
             
             # 根据选择的日期筛选数据
             filtered_df = df[df['Date'].dt.date == selected_date]
             
-            # 创建标题的超链接
-            filtered_df['Title'] = filtered_df.apply(
-                lambda x: f'<a href="{x["URL"]}" target="_blank">{x["Title"]}</a>', 
-                axis=1
-            )
+            # 处理Abstract列中的换行符
+            filtered_df['Abstract'] = filtered_df['Abstract'].str.replace('\n', ' ')
             
-            # 显示筛选后的数据表格，显示标题、作者、摘要和日期
-            st.write(
-                filtered_df[['Title', 'Authors', 'Abstract', 'Date']]
-                .to_html(escape=False, index=False),
-                unsafe_allow_html=True
+            # 使用st.dataframe显示数据，设置列宽和高度
+            st.dataframe(
+                filtered_df[['Title', 'Authors', 'Abstract', 'Date', 'URL']],
+                column_config={
+                    "Title": st.column_config.TextColumn(
+                        "Title",
+                        width="medium"
+                    ),
+                    "Authors": st.column_config.TextColumn(
+                        "Authors",
+                        width="small"
+                    ),
+                    "Abstract": st.column_config.TextColumn(
+                        "Abstract",
+                        width="large"
+                    ),
+                    "Date": st.column_config.DateColumn(
+                        "Date",
+                        width="small"
+                    ),
+                    "URL": st.column_config.LinkColumn(
+                        "URL",
+                        width="small"
+                    )
+                },
+                hide_index=True,
+                use_container_width=True
             )
             
         except Exception as e:
             st.error(f"读取CSV文件时发生错误: {str(e)}")
+
+    # 修改生成按钮部分
+    if st.button("生成论文快报"):
+        if filtered_df.empty:
+            st.error("所选日期没有论文数据")
+        else:
+            with st.spinner("正在生成论文快报..."):
+                report, summaries = generate_daily_report_from_df(filtered_df, model_name)
+                
+                # 在UI中显示每篇论文的摘要和图片
+                for i, (title, summary, image_path) in enumerate(summaries, 1):
+                    st.markdown(f"## {i}. {title}")
+                    
+                    # 如果有图片，显示图片（放在摘要上方，并设置固定宽度）
+                    if image_path and os.path.exists(image_path):
+                        # 创建三列，图片显示在中间列
+                        col1, col2, col3 = st.columns([1, 2, 1])
+                        with col2:
+                            st.image(image_path, 
+                                    caption=f"论文 {i} 的图片",
+                                    width=400)  # 设置固定宽度为400像素
+                    
+                    # 显示摘要
+                    st.markdown(summary)
+                    st.markdown("---")
+                
+                # 准备下载文件
+                report_filename = f"论文快报_{selected_date}.md"
+                
+                # 创建一个临时目录来存放报告和图片
+                import tempfile
+                import shutil
+                
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    # 复制图片文件夹到临时目录
+                    if os.path.exists("images"):
+                        shutil.copytree("images", os.path.join(temp_dir, "images"))
+                    
+                    # 将报告写入临时目录
+                    report_path = os.path.join(temp_dir, report_filename)
+                    with open(report_path, "w", encoding="utf-8") as f:
+                        f.write(report)
+                    
+                    # 将整个临时目录打包成zip文件
+                    zip_filename = f"论文快报_{selected_date}.zip"
+                    shutil.make_archive(
+                        os.path.join(os.getcwd(), zip_filename.replace('.zip', '')),
+                        'zip',
+                        temp_dir
+                    )
+                
+                # 提供zip文件下载
+                with open(zip_filename, "rb") as f:
+                    st.download_button(
+                        label="下载论文快报(包含图片)",
+                        data=f,
+                        file_name=zip_filename,
+                        mime="application/zip"
+                    )
+
+with tab2:
+    st.header("arxiv论文抓取")
+    
+    # 使用固定的CSV文件名
+    csv_filename = "papers.csv"
+    
+    if st.button("开始抓取论文"):
+        with st.spinner("正在从arxiv抓取论文..."):
+            try:
+                downloaded_count = arxiv_pdf.fetch_papers(folder_path, csv_filename, query= "cat:cs.AI", author_filter=False, start_date=datetime.today()-timedelta(1), end_date=datetime.today())
+                st.success(f"成功下载 {downloaded_count} 篇论文到 {folder_path} 文件夹")
+                st.info(f"论文信息已保存到 {csv_filename}")
+            except Exception as e:
+                st.error(f"抓取论文时发生错误: {str(e)}")
