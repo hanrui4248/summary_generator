@@ -4,3 +4,5 @@ PyMuPDF
 arxiv
 beautifulsoup4
 requests
+aiofiles
+kreuzberg
