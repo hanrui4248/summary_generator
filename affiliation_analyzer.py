@@ -1,9 +1,10 @@
 import pandas as pd
 import os
 import logging
+import json
 from openai import OpenAI
 from tqdm import tqdm
-
+from orgs import orgs
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -67,7 +68,7 @@ class AffiliationAnalyzer:
         """
         if not concatenated_str:
             logging.warning("拼接字符串为空")
-            return {}
+            return []
         
         # 构建初始提示
         initial_prompt = f"""
@@ -128,11 +129,29 @@ class AffiliationAnalyzer:
             
             final_result = verification_response.choices[0].message.content.strip()
             logging.info("完成两轮分析验证")
-            return final_result
+            
+            # 解析结果字符串为数组
+            try:
+                indices = json.loads(final_result.replace("'", "\""))
+                if not isinstance(indices, list):
+                    raise ValueError("索引必须是列表格式")
+                return indices
+            except json.JSONDecodeError:
+                # 尝试使用eval解析（不推荐，但作为备选）
+                try:
+                    indices = eval(final_result)
+                    if isinstance(indices, list):
+                        return indices
+                    else:
+                        logging.error("解析结果不是列表格式")
+                        return []
+                except:
+                    logging.error(f"无法解析结果: {final_result}")
+                    return []
         
         except Exception as e:
             logging.error(f"分析机构失败: {str(e)}")
-            return "{}"
+            return []
     
     def process_csv(self, csv_path, target_orgs):
         """
@@ -143,7 +162,7 @@ class AffiliationAnalyzer:
             target_orgs: 目标机构列表
             
         返回:
-            分析结果
+            分析结果（索引数组）
         """
         try:
             # 拼接机构字段
@@ -163,13 +182,11 @@ class AffiliationAnalyzer:
 
 def main():
     # 目标机构列表
-    target_orgs = ["Google", "Meta", "Microsoft", "OpenAI", "Anthropic", "DeepMind", "University of British Columbia", "Alibaba", "University of Toronto", "Peking University"]
-    
     analyzer = AffiliationAnalyzer()
-    result = analyzer.process_csv("test.csv", target_orgs)
+    result = analyzer.process_csv("test.csv", orgs)
     
-    # print("分析结果:")
-    # print(result)
+    print("分析结果:")
+    print(result)
     
     
 

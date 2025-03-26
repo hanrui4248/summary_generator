@@ -9,3 +9,4 @@ test.csv
 pdf_summarizer.py
 test_arxiv.py
 *.pyc
+markdown_to_docx.py

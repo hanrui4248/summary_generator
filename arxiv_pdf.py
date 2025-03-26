@@ -119,7 +119,6 @@ async def fetch_papers_async(pdf_folder_path, csv_filename=FILENAME, query=QUERY
     # 写入CSV文件
     header = ["Paper_ID", "Title", "Authors", "Abstract", "Primary Category", "Categories", "URL", "Date", "Content"]
     downloaded_count = 0
-    write_type = "a" if os.path.isfile(csv_filename) else "w"
     
     # 异步处理所有论文
     tasks = []
@@ -130,15 +129,14 @@ async def fetch_papers_async(pdf_folder_path, csv_filename=FILENAME, query=QUERY
     paper_contents = await async_tqdm.gather(*tasks, desc="异步处理论文", unit="篇")
     
     # 写入CSV
-    await asyncio.to_thread(write_csv_data, csv_filename, header, results, paper_contents, write_type == "w")
+    await asyncio.to_thread(write_csv_data, csv_filename, header, results, paper_contents)
     
     return len([content for content in paper_contents if content])  # 返回成功下载的数量
 
-def write_csv_data(filename, header, results, paper_contents, write_header):
-    with open(filename, 'w' if write_header else 'a', newline='', encoding='utf-8') as file:
+def write_csv_data(filename, header, results, paper_contents):
+    with open(filename, 'w', newline='', encoding='utf-8') as file:
         writer = csv.DictWriter(file, fieldnames=header)
-        if write_header:
-            writer.writeheader()
+        writer.writeheader()
         
         for i, r in enumerate(results):
             authors_strings = []
@@ -173,7 +171,7 @@ def fetch_papers(pdf_folder_path, csv_filename=FILENAME, query=QUERY, author_fil
 
 def get_last_day():
     today = dt.datetime.today()
-    yesterday = today - dt.timedelta(3)
+    yesterday = today - dt.timedelta(days=1)
 
     end_time = today.strftime("%Y%m%d") + "1200"
     start_time = yesterday.strftime("%Y%m%d") + "1200"

@@ -43,20 +43,15 @@ class PaperAssistant:
         实验与评估结果：...
         """
 
-    def extract_papers_by_indices(self, csv_path, indices_str):
+    def extract_papers_by_indices(self, csv_path, indices):
         try:
             # 读取CSV文件
             df = pd.read_csv(csv_path)
             logging.info(f"成功读取CSV文件，共{len(df)}条记录")
             
-            # 解析索引字符串
-            try:
-                indices = json.loads(indices_str.replace("'", "\""))
-                if not isinstance(indices, list):
-                    raise ValueError("索引必须是列表格式")
-            except json.JSONDecodeError:
-                # 尝试使用eval解析（不推荐，但作为备选）
-                indices = eval(indices_str)
+            # 确保indices是列表类型
+            if not isinstance(indices, list):
+                raise ValueError("索引必须是列表格式")
             
             # 提取指定索引的行，现在包括URL字段
             extracted_df = df.iloc[indices][["Title", "Affiliation", "Paper_ID", "URL"]]
@@ -182,10 +177,10 @@ class PaperAssistant:
             logging.error(f"生成摘要失败: {str(e)}")
             return "无法生成摘要，请查看原文。"
     
-    def process_and_download(self, csv_path, indices_str):
+    def process_and_download(self, csv_path, indices):
         try:
             # 提取论文信息
-            papers_df = self.extract_papers_by_indices(csv_path, indices_str)
+            papers_df = self.extract_papers_by_indices(csv_path, indices)
             
             # 下载论文并获取markdown内容
             markdown_content = self.download_and_summarize(papers_df)

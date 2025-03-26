@@ -1,16 +1,31 @@
 import streamlit as st
 import os
 import base64
-from paper_pipeline import run_pipeline
+import datetime as dt
+from arxiv_pdf import fetch_papers
+from paper_affiliation_classifier import PaperAffiliationClassifier
 from paper_assistant import PaperAssistant
 import affiliation_analyzer
+from abstract_matcher import AbstractMatcher
 import re
 import pandas as pd
+from orgs import orgs
+from docx import Document
+from docx.shared import Inches
+import io
+import shutil
+
 
 def get_download_link(content, filename, text):
     """生成下载链接"""
     b64 = base64.b64encode(content.encode()).decode()
     href = f'<a href="data:text/markdown;base64,{b64}" download="{filename}">{text}</a>'
+    return href
+
+def get_binary_file_downloader_html(bin_file, file_label='文件', file_name='文件.docx'):
+    """生成二进制文件下载链接"""
+    b64 = base64.b64encode(bin_file).decode()
+    href = f'<a href="data:application/octet-stream;base64,{b64}" download="{file_name}">{file_label}</a>'
     return href
 
 def display_image(image_path, base_dir):
@@ -132,7 +147,155 @@ def display_markdown_with_images(markdown_content, base_dir="."):
                 process_markdown_line(lines[i], base_dir)
             i += 1
 
+def markdown_to_docx(markdown_content, base_dir="."):
+    """将Markdown内容转换为Word文档"""
+    doc = Document()
+    
+    # 添加标题
+    doc.add_heading('每日arXiv论文快报', 0)
+    
+    # 分割内容为行
+    lines = markdown_content.split('\n')
+    i = 0
+    
+    # 当前段落
+    current_paragraph = None
+    
+    while i < len(lines):
+        line = lines[i].strip()
+        
+        # 处理标题
+        if line.startswith('# '):
+            doc.add_heading(line[2:], 1)
+            i += 1
+        elif line.startswith('## '):
+            doc.add_heading(line[3:], 2)
+            i += 1
+        elif line.startswith('### '):
+            doc.add_heading(line[4:], 3)
+            i += 1
+        # 处理表格
+        elif line.startswith('|') and '|' in line[1:]:
+            # 收集表格行
+            table_lines = []
+            while i < len(lines) and lines[i].strip().startswith('|'):
+                table_lines.append(lines[i].strip())
+                i += 1
+            
+            # 解析表格
+            rows = []
+            for table_line in table_lines:
+                # 跳过分隔行
+                if re.match(r'\|\s*[-:]+\s*\|', table_line):
+                    continue
+                
+                # 分割单元格
+                cells = table_line.split('|')[1:-1]  # 去掉首尾的 |
+                rows.append([cell.strip() for cell in cells])
+            
+            if rows:
+                # 创建表格
+                table = doc.add_table(rows=len(rows), cols=len(rows[0]))
+                
+                # 填充表格内容
+                for row_idx, row in enumerate(rows):
+                    for col_idx, cell_content in enumerate(row):
+                        # 检查单元格是否包含图片
+                        img_match = re.search(r'!\[(.*?)\]\((.*?)\)', cell_content)
+                        if img_match:
+                            # 这是一个包含图片的单元格
+                            img_path = img_match.group(2)
+                            cell = table.cell(row_idx, col_idx)
+                            
+                            # 尝试添加图片
+                            try:
+                                possible_paths = [
+                                    img_path,
+                                    os.path.join(base_dir, img_path),
+                                    os.path.abspath(img_path),
+                                    os.path.join(os.getcwd(), img_path)
+                                ]
+                                
+                                for path in possible_paths:
+                                    if os.path.exists(path):
+                                        cell.paragraphs[0].add_run().add_picture(path, width=Inches(2.0))
+                                        break
+                            except Exception as e:
+                                cell.text = f"[图片: {img_path}]"
+                        else:
+                            # 普通文本单元格
+                            table.cell(row_idx, col_idx).text = cell_content
+        
+        # 处理图片
+        elif '![' in line and '](' in line:
+            img_pattern = r'!\[(.*?)\]\((.*?)\)'
+            text_parts = re.split(img_pattern, line)
+            
+            # 创建新段落
+            current_paragraph = doc.add_paragraph()
+            
+            for i_part, part in enumerate(text_parts):
+                if i_part % 3 == 0 and part.strip():  # 文本部分
+                    current_paragraph.add_run(part)
+                elif i_part % 3 == 2:  # 图片路径
+                    img_path = part
+                    try:
+                        possible_paths = [
+                            img_path,
+                            os.path.join(base_dir, img_path),
+                            os.path.abspath(img_path),
+                            os.path.join(os.getcwd(), img_path)
+                        ]
+                        
+                        for path in possible_paths:
+                            if os.path.exists(path):
+                                current_paragraph.add_run().add_picture(path, width=Inches(4.0))
+                                break
+                    except Exception as e:
+                        current_paragraph.add_run(f"[图片: {img_path}]")
+            
+            i += 1
+        
+        # 处理普通文本
+        elif line:
+            doc.add_paragraph(line)
+            i += 1
+        else:
+            # 空行
+            i += 1
+    
+    # 保存到内存中
+    docx_io = io.BytesIO()
+    doc.save(docx_io)
+    docx_io.seek(0)
+    
+    return docx_io.getvalue()
+
 def main():
+    # 清空pdf_folder和images文件夹
+    pdf_folder = "pdf_folder"
+    if os.path.exists(pdf_folder):
+        for file in os.listdir(pdf_folder):
+            file_path = os.path.join(pdf_folder, file)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+    else:
+        os.makedirs(pdf_folder)
+    
+    # 清空images文件夹
+    images_folder = "images"
+    if os.path.exists(images_folder):
+        for file in os.listdir(images_folder):
+            file_path = os.path.join(images_folder, file)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+    else:
+        os.makedirs(images_folder)
+    
     st.set_page_config(page_title="每日arXiv论文快报", page_icon="📚")
     
     st.title("AI4Paper")
@@ -140,26 +303,21 @@ def main():
     
     # 添加一些配置选项
     with st.expander("高级配置"):
-        days_back = st.slider("查询过去几天的论文", 1, 7, 3)
+        days_back = st.slider("查询过去几天的论文", 1, 7, 1)
         
         # 目标机构多选
-        default_orgs = [
-            "Google", "Meta", "Microsoft", "OpenAI", 
-            "Anthropic", "DeepMind", "Stanford", 
-            "Alibaba", "Huawei", "Baidu",
-        ]
+        default_orgs = orgs
         target_orgs = st.multiselect(
             "目标机构", 
-            options=default_orgs + ["其他"],
+            options=default_orgs,
             default=default_orgs
         )
         
-        # 如果选择了"其他"，允许用户输入自定义机构
-        if "其他" in target_orgs:
-            target_orgs.remove("其他")
-            custom_org = st.text_input("输入自定义机构名称")
-            if custom_org:
-                target_orgs.append(custom_org)
+        # 添加关键词查询选项
+        use_keyword_filter = st.checkbox("使用自然语言过滤论文", value=False)
+        keyword_query = ""
+        if use_keyword_filter:
+            keyword_query = st.text_input("请输入提示词", placeholder="例如：强化学习、机器人、大模型等")
     
     # 生成按钮
     if st.button("生成每日论文快报", type="primary"):
@@ -167,8 +325,8 @@ def main():
             # 创建进度条
             progress_bar = st.progress(0)
             
-            # 第一步：运行pipeline获取论文
-            st.info("步骤1/3: 从arXiv获取论文...")
+            # 第一步：运行pipeline获取论文,并打上分类标签
+            st.info("步骤1/4: 从arXiv获取论文...")
             progress_bar.progress(10)
             
             csv_filename = "papers.csv"
@@ -177,46 +335,96 @@ def main():
             # 使用默认的查询字符串 "cat:cs.AI"
             query = "cat:cs.AI"
             
-            papers_count = run_pipeline(
+            end_date = dt.datetime.today()
+            start_date = end_date - dt.timedelta(days=days_back)
+            papers_count = fetch_papers(
+                pdf_folder, 
                 csv_filename=csv_filename,
-                pdf_folder=pdf_folder,
                 query=query,
-                days_back=days_back,
-                target_orgs=target_orgs
+                author_filter=False,
+                start_date=start_date,
+                end_date=end_date
             )
             
             if papers_count == 0:
                 st.error("没有找到符合条件的论文，请调整查询参数后重试。")
                 return
             
-            progress_bar.progress(40)
+            classifier = PaperAffiliationClassifier()
+            classifier.process_csv(csv_filename)
+            
+            progress_bar.progress(30)
             
             # 第二步：获取目标机构的论文索引
-            st.info("步骤2/3: 模型筛选目标机构论文...")
-            analyzer = affiliation_analyzer.AffiliationAnalyzer()
-            indices_result = analyzer.process_csv(csv_filename, target_orgs)
+            indices_result = []
+            if target_orgs:
+                st.info("步骤2/4: 模型筛选目标机构论文...")
+                analyzer = affiliation_analyzer.AffiliationAnalyzer()
+                indices_result = analyzer.process_csv(csv_filename, target_orgs)
+                progress_bar.progress(50)
             
-            progress_bar.progress(70)
+            # 第三步：根据关键词过滤论文
+            keyword_indices = []
+            if use_keyword_filter and keyword_query:
+                st.info("步骤3/4: 根据关键词过滤论文...")
+                matcher = AbstractMatcher()
+                keyword_indices = matcher.process_csv(csv_filename, keyword_query)
+                progress_bar.progress(70)
+            else:
+                st.info("步骤3/4: 跳过关键词过滤...")
+                progress_bar.progress(70)
             
-            # 第三步：下载论文并生成摘要
-            st.info("步骤3/3: 生成论文摘要...")
+            # 合并过滤结果
+            final_indices = []
+            if target_orgs and use_keyword_filter and keyword_query:
+                # 两种过滤器都启用，取交集
+                final_indices = list(set(indices_result).intersection(set(keyword_indices)))
+                if not final_indices:
+                    st.warning("没有同时满足机构和关键词条件的论文，将显示所有满足机构条件的论文")
+                    final_indices = indices_result
+            elif target_orgs:
+                # 只使用机构过滤
+                final_indices = indices_result
+            elif use_keyword_filter and keyword_query:
+                # 只使用关键词过滤
+                final_indices = keyword_indices
+            else:
+                # 都不使用，获取所有论文索引
+                df = pd.read_csv(csv_filename)
+                final_indices = list(range(len(df)))
+            
+            if not final_indices:
+                st.error("没有找到符合条件的论文，请调整过滤条件后重试。")
+                return
+            
+            # 第四步：下载论文并生成摘要
+            st.info("步骤4/4: 生成论文摘要...")
             assistant = PaperAssistant(output_dir=pdf_folder)
-            markdown_content = assistant.process_and_download(csv_filename, indices_result)
-            
+            markdown_content = assistant.process_and_download(csv_filename, final_indices)
             
             progress_bar.progress(100)
             
             # 显示结果
-            st.success(f"成功生成论文快报")
-            
+            st.success(f"成功生成论文快报，共包含 {len(final_indices)} 篇论文（从 {papers_count} 篇论文中筛选）")
             # 使用新的display_markdown_with_images函数显示markdown内容
             display_markdown_with_images(markdown_content, pdf_folder)
             
+            # 生成Word文档
+            docx_content = markdown_to_docx(markdown_content, pdf_folder)
+            
             # 提供下载链接
-            st.markdown(
-                get_download_link(markdown_content, "每日arxiv精选论文.md", "点击下载Markdown文件"),
-                unsafe_allow_html=True
-            )
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(
+                    get_download_link(markdown_content, "AI生成_每日arXiv精选论文.md", "点击下载Markdown文件"),
+                    unsafe_allow_html=True
+                )
+            with col2:
+                st.markdown(
+                    get_binary_file_downloader_html(docx_content, "点击下载Word文件", "AI生成_每日arXiv精选论文.md.docx"),
+                    unsafe_allow_html=True
+                )
+            
 
 if __name__ == "__main__":
     main() 

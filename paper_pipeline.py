@@ -4,6 +4,7 @@ import arxiv_pdf
 import paper_affiliation_classifier
 import affiliation_analyzer
 import paper_assistant
+from orgs import orgs
 
 def run_pipeline(csv_filename="papers.csv",
                 pdf_folder="pdf_folder",
@@ -31,11 +32,7 @@ def run_pipeline(csv_filename="papers.csv",
         
         # 设置默认目标机构
         if target_orgs is None:
-            target_orgs = [
-                "Google", "Meta", "Microsoft", "OpenAI", 
-                "Anthropic", "DeepMind", "Stanford", 
-                "Alibaba", "Huawei", "Baidu", "Peking University"
-            ]
+            target_orgs = orgs
         
         # 1. 设置日期范围
         end_date = dt.datetime.today()
