@@ -4,4 +4,4 @@ PyMuPDF
 arxiv
 requests
 beautifulsoup4
-docx
+python-docx
