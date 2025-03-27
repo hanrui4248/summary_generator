@@ -33,9 +33,7 @@ def main():
     st.title("AI4Paper")
 
     if os.path.exists("paper_pipeline.log"):
-        with open("paper_pipeline.log", "r") as f:
-            lines = f.readlines()
-            print(lines)
+        print("paper_pipeline.log存在")
     
     # 检查并启动paper_pipeline.py
     if not is_pipeline_running():
