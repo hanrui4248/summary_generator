@@ -34,10 +34,10 @@ def main():
     
     # 检查并启动paper_pipeline.py
     if not is_pipeline_running():
-        print("流水线未启动，现在启动论文处理流水线")
+        st.info("流水线未启动，现在启动论文处理流水线")
         start_pipeline_background(st)
     else:
-        print("论文处理流水线正在后台运行中")
+        st.info("论文处理流水线正在后台运行中")
     
     # 加载默认的markdown文件
     default_markdown = load_default_markdown()
@@ -174,7 +174,6 @@ def main():
         docx_content = markdown_to_docx(default_markdown)
         # 提供下载链接
         provide_download_links(default_markdown, docx_content)
-            
 
 if __name__ == "__main__":
     main() 
