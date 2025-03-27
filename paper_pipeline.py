@@ -97,9 +97,19 @@ def run_pipeline(csv_filename="papers.csv",
 
 def run_scheduled_pipeline():
     """运行计划任务的包装函数，记录运行时间"""
-    current_time = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # 每次运行时清空日志文件
+    with open("pipeline.log", "w") as log_file:
+        current_time = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_file.write(f"[{current_time}] 开始执行计划任务...\n")
+    
     print(f"\n[{current_time}] 开始执行计划任务...")
     run_pipeline()
+    
+    # 记录完成时间
+    with open("pipeline.log", "a") as log_file:
+        current_time = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_file.write(f"[{current_time}] 计划任务执行完成\n")
+    
     print(f"[{current_time}] 计划任务执行完成")
 
 def schedule_pipeline():
