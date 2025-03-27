@@ -3,7 +3,6 @@ import os
 import logging
 import json
 from openai import OpenAI
-from tqdm import tqdm
 from orgs import orgs
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

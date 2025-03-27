@@ -1,16 +1,19 @@
 import os
 import datetime as dt
+import time
+import schedule
 import arxiv_pdf
 import paper_affiliation_classifier
 import affiliation_analyzer
-import paper_assistant
+from paper_assistant import PaperAssistant
 from orgs import orgs
+from tools import clean_folder
 
 def run_pipeline(csv_filename="papers.csv",
                 pdf_folder="pdf_folder",
                 query="cat:cs.AI", 
                 author_filter=False,
-                days_back=3,
+                days_back=1,
                 target_orgs=None):
     """
     运行完整的论文处理流水线
@@ -27,8 +30,9 @@ def run_pipeline(csv_filename="papers.csv",
         下载的论文数量
     """
     try:
-        # 创建PDF文件夹
-        os.makedirs(pdf_folder, exist_ok=True)
+        # 清空pdf_folder和images文件夹
+        clean_folder("pdf_folder")
+        clean_folder("images")
         
         # 设置默认目标机构
         if target_orgs is None:
@@ -67,9 +71,17 @@ def run_pipeline(csv_filename="papers.csv",
         analyzer = affiliation_analyzer.AffiliationAnalyzer()
         indices_result = analyzer.process_csv(csv_filename, target_orgs)
         print(f"机构分析完成，找到的索引: {indices_result}")
+         # 第四步：下载论文并生成摘要
+        print("第4步: 生成图文摘要...")
+        assistant = PaperAssistant(output_dir=pdf_folder)
+        markdown_content = assistant.process_and_download(csv_filename, indices_result)
         
-        # 注意：我们不在这里下载论文，而是在Streamlit应用中处理
-        # 这样可以避免重复下载
+        # 将内容写入markdown文件
+        markdown_filename = "每日默认精选论文.md"
+        with open(markdown_filename, "w", encoding="utf-8") as f:
+            f.write(markdown_content)
+        
+        print(f"已将论文摘要保存到 {markdown_filename}")
         
         # 6. 输出结果摘要
         print("=== 论文处理流水线完成 ===")
@@ -83,10 +95,45 @@ def run_pipeline(csv_filename="papers.csv",
         print(traceback.format_exc())
         return 0
 
+def run_scheduled_pipeline():
+    """运行计划任务的包装函数，记录运行时间"""
+    current_time = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"\n[{current_time}] 开始执行计划任务...")
+    run_pipeline()
+    print(f"[{current_time}] 计划任务执行完成")
+
+def schedule_pipeline():
+    """设置定时任务，每12小时运行一次pipeline"""
+    # 创建锁文件，记录PID
+    with open("paper_pipeline.lock", "w") as f:
+        f.write(str(os.getpid()))
+    
+    try:
+        # 立即运行一次
+        run_scheduled_pipeline()
+        
+        # 设置每12小时运行一次
+        schedule.every(12).hours.do(run_scheduled_pipeline)
+        
+        print("已设置每12小时自动运行一次论文处理流水线")
+        print("按Ctrl+C可以停止自动运行")
+        
+        # 持续运行，等待计划任务
+        try:
+            while True:
+                schedule.run_pending()
+                time.sleep(60)  # 每分钟检查一次是否有待运行的任务
+        except KeyboardInterrupt:
+            print("自动运行已停止")
+    finally:
+        # 删除锁文件
+        if os.path.exists("paper_pipeline.lock"):
+            os.remove("paper_pipeline.lock")
+
 def main():
     """主函数"""
-    # 直接调用流水线函数，使用默认参数
-    run_pipeline()
+    # 直接调用schedule_pipeline函数
+    schedule_pipeline()
 
 if __name__ == "__main__":
     main() 

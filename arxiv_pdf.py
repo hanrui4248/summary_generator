@@ -109,7 +109,7 @@ async def fetch_papers_async(pdf_folder_path, csv_filename=FILENAME, query=QUERY
         query =  f"submittedDate:[{start_date} TO {end_date}] AND {final_query}",
         sort_by = arxiv.SortCriterion.LastUpdatedDate,
         sort_order = arxiv.SortOrder.Descending,
-        max_results = 50
+        max_results = 350
     )
     results = list(client.results(search))
     

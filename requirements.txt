@@ -5,3 +5,4 @@ arxiv
 requests
 beautifulsoup4
 python-docx
+schedule
