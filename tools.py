@@ -3,6 +3,7 @@ import shutil
 import psutil
 import subprocess
 import sys
+import time
 
 def clean_folder(folder_path):
     """
@@ -56,49 +57,57 @@ def is_pipeline_running():
     return False
 
 def start_pipeline_background(st):
-    """启动paper_pipeline.py作为完全独立的后台进程"""
+    """启动paper_pipeline.py作为完全独立的后台进程，确保使用相同的Python环境"""
     if not is_pipeline_running():
         try:
-            # 创建一个完全分离的进程
+            # 获取当前Python解释器的完整路径
+            python_executable = sys.executable
+            print(f"当前Python解释器路径: {python_executable}")
+            
+            # 获取当前工作目录的绝对路径
+            current_dir = os.path.abspath(os.getcwd())
+            pipeline_script = os.path.join(current_dir, "paper_pipeline.py")
+            print(f"流水线脚本路径: {pipeline_script}")
+            
             if os.name == 'nt':  # Windows
-                print("在Windows上启动新的控制台窗口")
-                # 使用start命令启动新的控制台窗口（隐藏）
+                print("在Windows上启动新的进程")
+                # 创建启动信息对象以隐藏窗口
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 startupinfo.wShowWindow = 0  # 隐藏窗口
                 
-                # 使用pythonw.exe而不是python.exe以避免控制台窗口
-                python_exe = os.path.join(os.path.dirname(sys.executable), 'pythonw.exe')
-                if not os.path.exists(python_exe):
-                    python_exe = sys.executable
-                
+                # 使用完整路径的Python解释器启动脚本
                 subprocess.Popen(
-                    [python_exe, 'paper_pipeline.py'],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
+                    [python_executable, pipeline_script],
+                    stdout=open("pipeline.log", "w"),
+                    stderr=subprocess.STDOUT,
                     startupinfo=startupinfo,
                     creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
                 )
             else:  # Linux/Mac
                 print("在Linux/Mac上启动新的进程")
-                if os.path.exists("pipeline.log"):
-                    print("pipeline.log存在")
-                    with open("pipeline.log", "r") as log_file:
-                        log_content = log_file.read()
-                        print(f"pipeline.log内容:\n{log_content}")
-                else:
-                    print("paper_pipeline.log不存在！！！")
-                # 使用nohup命令确保进程在终端关闭后继续运行
-                cmd = f"nohup python paper_pipeline.py > pipeline.log 2>&1 &"
+                # 使用完整路径的Python解释器启动脚本
+                cmd = f"nohup {python_executable} {pipeline_script} > pipeline.log 2>&1 &"
                 subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
                                  start_new_session=True)
-                if os.path.exists("pipeline.log"):
-                    print("pipeline.log存在")
-                else:
-                    print("pipeline.log不存在！！！")
+            
+            # 等待一小段时间，确保进程已启动并创建了日志文件
+            time.sleep(2)
+            
+            # 检查日志文件
+            if os.path.exists("pipeline.log"):
+                print("pipeline.log已创建")
+                with open("pipeline.log", "r") as log_file:
+                    log_content = log_file.read()
+                    print(f"pipeline.log初始内容:\n{log_content}")
+            else:
+                print("警告: pipeline.log未创建")
             
             print("已启动论文处理流水线后台任务")
+            st.success("已成功启动论文处理流水线")
         except Exception as e:
-            st.error(f"启动论文处理流水线失败: {str(e)}")
+            error_msg = f"启动论文处理流水线失败: {str(e)}"
+            print(error_msg)
+            st.error(error_msg)
     else:
         print("论文处理流水线已在运行中") 
