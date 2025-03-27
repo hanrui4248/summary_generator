@@ -80,6 +80,7 @@ def start_pipeline_background(st):
                     creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
                 )
             else:  # Linux/Mac
+                print("在Linux/Mac上启动新的进程")
                 # 使用nohup命令确保进程在终端关闭后继续运行
                 cmd = f"nohup python paper_pipeline.py > pipeline.log 2>&1 &"
                 subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
