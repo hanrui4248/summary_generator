@@ -34,6 +34,8 @@ def main():
 
     if os.path.exists("paper_pipeline.log"):
         print("paper_pipeline.log存在")
+    else:
+        print("paper_pipeline.log不存在！！！")
     
     # 检查并启动paper_pipeline.py
     if not is_pipeline_running():
