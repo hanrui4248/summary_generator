@@ -81,18 +81,18 @@ def start_pipeline_background(st):
                 )
             else:  # Linux/Mac
                 print("在Linux/Mac上启动新的进程")
-                if os.path.exists("paper_pipeline.log"):
-                    print("paper_pipeline.log存在")
+                if os.path.exists("pipeline.log"):
+                    print("pipeline.log存在")
                 else:
                     print("paper_pipeline.log不存在！！！")
                 # 使用nohup命令确保进程在终端关闭后继续运行
                 cmd = f"nohup python paper_pipeline.py > pipeline.log 2>&1 &"
                 subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
                                  start_new_session=True)
-                if os.path.exists("paper_pipeline.log"):
-                    print("paper_pipeline.log存在")
+                if os.path.exists("pipeline.log"):
+                    print("pipeline.log存在")
                 else:
-                    print("paper_pipeline.log不存在！！！")
+                    print("pipeline.log不存在！！！")
             
             print("已启动论文处理流水线后台任务")
         except Exception as e:
