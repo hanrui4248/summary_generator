@@ -61,6 +61,7 @@ def start_pipeline_background(st):
         try:
             # 创建一个完全分离的进程
             if os.name == 'nt':  # Windows
+                print("在Windows上启动新的控制台窗口")
                 # 使用start命令启动新的控制台窗口（隐藏）
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
