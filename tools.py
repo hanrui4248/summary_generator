@@ -96,15 +96,16 @@ def start_pipeline_background(st):
             
             # 检查日志文件
             if os.path.exists("pipeline.log"):
-                print("pipeline.log已创建")
                 with open("pipeline.log", "r") as log_file:
                     log_content = log_file.read()
+                    print("*****************************")
                     print(f"pipeline.log初始内容:\n{log_content}")
+                    print("*****************************")
             else:
                 print("警告: pipeline.log未创建")
             
             print("已启动论文处理流水线后台任务")
-            st.success("已成功启动论文处理流水线")
+            # st.success("已成功启动论文处理流水线")
         except Exception as e:
             error_msg = f"启动论文处理流水线失败: {str(e)}"
             print(error_msg)

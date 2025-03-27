@@ -33,10 +33,10 @@ def main():
     
     # 检查并启动paper_pipeline.py
     if not is_pipeline_running():
-        st.info("流水线未启动，现在启动论文处理流水线")
+        print("流水线未启动，现在启动论文处理流水线")
         start_pipeline_background(st)
     else:
-        st.info("论文处理流水线正在后台运行中")
+        print("论文处理流水线正在后台运行中")
     
     # 加载默认的markdown文件
     default_markdown = load_default_markdown()
