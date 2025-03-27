@@ -83,6 +83,9 @@ def start_pipeline_background(st):
                 print("在Linux/Mac上启动新的进程")
                 if os.path.exists("pipeline.log"):
                     print("pipeline.log存在")
+                    with open("pipeline.log", "r") as log_file:
+                        log_content = log_file.read()
+                        print(f"pipeline.log内容:\n{log_content}")
                 else:
                     print("paper_pipeline.log不存在！！！")
                 # 使用nohup命令确保进程在终端关闭后继续运行
