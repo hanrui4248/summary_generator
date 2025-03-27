@@ -24,6 +24,10 @@ def clean_folder(folder_path):
 
 def is_pipeline_running():
     """检查paper_pipeline.py是否已经在运行"""
+    if os.path.exists("paper_pipeline.log"):
+        print("paper_pipeline.log存在")
+    else:
+        print("paper_pipeline.log不存在！！！")
     # 首先检查锁文件
     if os.path.exists("paper_pipeline.lock"):
         try:

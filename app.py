@@ -12,7 +12,6 @@ from output_file_format_manager import (
     get_download_link, get_binary_file_downloader_html, 
     display_markdown_with_images, markdown_to_docx, load_default_markdown
 )
-import os
 def provide_download_links(markdown_content, docx_content, filename_prefix="AI生成_每日arXiv精选论文"):
     """提供markdown和docx格式的下载链接"""
     col1, col2 = st.columns(2)
@@ -31,11 +30,6 @@ def main():
     st.set_page_config(page_title="每日arXiv论文快报", page_icon="📚")
     
     st.title("AI4Paper")
-
-    if os.path.exists("paper_pipeline.log"):
-        print("paper_pipeline.log存在")
-    else:
-        print("paper_pipeline.log不存在！！！")
     
     # 检查并启动paper_pipeline.py
     if not is_pipeline_running():
