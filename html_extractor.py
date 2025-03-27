@@ -2,7 +2,7 @@ from bs4 import BeautifulSoup
 import requests
 
 
-def get_image(short_id):
+def get_image(short_id, image_dir="./images"):
     try:
         url = f"https://arxiv.org/html/{short_id}"
         response = requests.get(url)
@@ -21,7 +21,7 @@ def get_image(short_id):
                     src = src.replace("/html", f"/html/{short_id}")
                     if src.endswith((".png", ".jpg")):
                         suffix = src.split(".")[-1]
-                        file_path = f"./images/{short_id}_{downloaded_count}.{suffix}"
+                        file_path = f"{image_dir}/{short_id}_{downloaded_count}.{suffix}"
                         
                         # 检查图片是否已经存在
                         import os

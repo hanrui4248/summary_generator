@@ -5,6 +5,7 @@ report/
 test2.py
 papers.csv
 images/
+default_images/
 test.csv
 pdf_summarizer.py
 test_arxiv.py

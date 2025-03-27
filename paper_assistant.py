@@ -107,7 +107,7 @@ class PaperAssistant:
                 # 获取论文图片
                 logging.info(f"正在获取论文图片: {paper_id}")
                 # 从paper_id中提取short_id (例如: 2503.16203v1)
-                img_count = get_image(paper_id)
+                img_count = get_image(paper_id, self.image_dir)
                 
                 # 添加图片到markdown
                 if img_count > 0:

@@ -32,7 +32,7 @@ def run_pipeline(csv_filename="papers.csv",
     try:
         # 清空pdf_folder和images文件夹
         clean_folder("pdf_folder")
-        clean_folder("images")
+        clean_folder("default_images")
         
         # 设置默认目标机构
         if target_orgs is None:
@@ -73,7 +73,7 @@ def run_pipeline(csv_filename="papers.csv",
         print(f"机构分析完成，找到的索引: {indices_result}")
          # 第四步：下载论文并生成摘要
         print("第4步: 生成图文摘要...")
-        assistant = PaperAssistant(output_dir=pdf_folder)
+        assistant = PaperAssistant(output_dir=pdf_folder, image_dir="default_images")
         markdown_content = assistant.process_and_download(csv_filename, indices_result)
         
         # 将内容写入markdown文件
