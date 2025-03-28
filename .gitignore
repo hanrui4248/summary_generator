@@ -14,3 +14,4 @@ markdown_to_docx.py
 *.log
 *.lock
 *.md
+*.yaml
