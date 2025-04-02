@@ -9,8 +9,10 @@ import html_extractor as himage
 import fitz
 import asyncio
 from tqdm.asyncio import tqdm as async_tqdm
+import logging
 
-QUERY = "cat:cs.AI"
+QUERY = "(cat:cs.DC OR cat:cs.AR)"
+# QUERY = "cat:cs.AI"
 FILENAME = "test.csv"
 
 
@@ -82,12 +84,19 @@ async def download_and_process_pdf(r, pdf_folder_path):
     
     return paper_content
 
-async def fetch_papers_async(pdf_folder_path, csv_filename=FILENAME, query=QUERY, author_filter=True, start_date=None, end_date=None):
+def get_arxiv_results(query, author_filter=True, start_date=None, end_date=None, max_results=350):
     """
-    异步抓取论文并下载PDF文件
-    :param pdf_folder_path: PDF文件保存路径
-    :param csv_filename: CSV文件保存路径
-    :return: 下载的论文数量
+    构建并执行arxiv搜索查询，返回搜索结果列表
+    
+    参数:
+        query: 基础查询字符串
+        author_filter: 是否应用作者过滤
+        start_date: 开始日期
+        end_date: 结束日期
+        max_results: 最大结果数量
+        
+    返回:
+        arxiv搜索结果列表
     """
     if author_filter:
         key_authors = load_authors_csv()
@@ -97,21 +106,36 @@ async def fetch_papers_async(pdf_folder_path, csv_filename=FILENAME, query=QUERY
         final_query = final_query[:-4] + ")" #Removing final " OR "
     else:
         final_query = query
+        
     if start_date == None or end_date == None:
         start_date, end_date = get_last_day()
     else:
         start_date = start_date.strftime("%Y%m%d") + "1200"
         end_date = end_date.strftime("%Y%m%d") + "1200"
     
+    # print(start_date)
+    # print(end_date)
+    # print(final_query)
+    
     # 使用同步方式获取论文列表
     client = arxiv.Client()
     search = arxiv.Search(
-        query =  f"submittedDate:[{start_date} TO {end_date}] AND {final_query}",
+        query = f"submittedDate:[{start_date} TO {end_date}] AND {final_query}",
         sort_by = arxiv.SortCriterion.LastUpdatedDate,
         sort_order = arxiv.SortOrder.Descending,
-        max_results = 350
+        max_results = max_results
     )
-    results = list(client.results(search))
+    return list(client.results(search))
+
+async def fetch_papers_async(pdf_folder_path, csv_filename=FILENAME, query=QUERY, author_filter=True, start_date=None, end_date=None):
+    """
+    异步抓取论文并下载PDF文件
+    :param pdf_folder_path: PDF文件保存路径
+    :param csv_filename: CSV文件保存路径
+    :return: 下载的论文数量
+    """
+    # 获取arxiv搜索结果
+    results = get_arxiv_results(query, author_filter, start_date, end_date)
     
     # 确保PDF保存目录存在
     os.makedirs(pdf_folder_path, exist_ok=True)
@@ -171,7 +195,7 @@ def fetch_papers(pdf_folder_path, csv_filename=FILENAME, query=QUERY, author_fil
 
 def get_last_day():
     today = dt.datetime.today()
-    yesterday = today - dt.timedelta(days=1)
+    yesterday = today - dt.timedelta(days=2)
 
     end_time = today.strftime("%Y%m%d") + "1200"
     start_time = yesterday.strftime("%Y%m%d") + "1200"
@@ -185,9 +209,28 @@ def unzip_archive():
         tar.extractall(path = "./temp")
         tar.close()
 
+
+# ... existing code ...
+# def test_arxiv_results(paper_id):
+#     client = arxiv.Client()
+#     search = arxiv.Search(
+#         id_list=paper_id,  # 例如: "2303.12712"
+#         max_results=1
+#     )
+#     return list(client.results(search))
+# ... existing code ...
 def main():
+    # logging.basicConfig(level=logging.DEBUG)
+    # 使用支持时区的方法替代 utcnow()
+    # today = dt.datetime.now(dt.timezone.utc).date()
+    today = dt.datetime.today()
+    end_date = today
+    start_date = today - dt.timedelta(days=2)
     #logging.basicConfig(level=logging.DEBUG)
-    fetch_papers("pdf_folder", author_filter=False)
+    fetch_papers("pdf_folder", author_filter=False, start_date=start_date, end_date=end_date)
+
+    # a = test_arxiv_results(["2504.00520"])
+    # print(a)
 
 if __name__ == "__main__":
     main()

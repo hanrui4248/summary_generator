@@ -16,3 +16,4 @@ markdown_to_docx.py
 *.md
 *.yaml
 *.pyc
+vue_flask/

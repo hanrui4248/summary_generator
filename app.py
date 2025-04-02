@@ -48,6 +48,18 @@ def main():
     with st.expander("高级配置"):
         days_back = st.slider("查询过去几天的论文", 1, 7, 1)
         
+        # 添加论文分类单选框（不显示标签）
+        categories = {
+            "人工智能": "cat:cs.AI",
+            "硬件与计算": "(cat:cs.DC OR cat:cs.AR)"
+        }
+        selected_category = st.radio(
+            label="选择分类",  # 空标签
+            options=list(categories.keys()),
+            index=0,
+            horizontal=True
+        )
+        
         # 目标机构多选
         default_orgs = orgs
         target_orgs = st.multiselect(
@@ -82,8 +94,8 @@ def main():
             csv_filename = "papers.csv"
             pdf_folder = "pdf_folder"
             
-            # 使用默认的查询字符串 "cat:cs.AI"
-            query = "cat:cs.AI"
+            # 构建查询字符串
+            query = categories[selected_category]
             
             end_date = dt.datetime.today()
             start_date = end_date - dt.timedelta(days=days_back)

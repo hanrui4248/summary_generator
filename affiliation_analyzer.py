@@ -111,7 +111,8 @@ class AffiliationAnalyzer:
             
             Please carefully verify your answer for correctness. Ensure you haven't missed any matches and haven't included any indices that shouldn't be in the list.
             If corrections are needed, provide an updated list of indices in the format [index1, index2, ...]
-            Return only the final list of indices, without any additional text.
+            Please strictly return the results in the following format,without any additional text:
+            [index1, index2, ...]
             """
             
             # 第二轮验证
